@@ -44,40 +44,37 @@ exports.putSignup = (req, res, next) => {
     });
 };
 
-exports.postLogin = (req, res, next) => {
+exports.postLogin = async (req, res, next) => {
   const { email, password } = req.body;
   let loadedUser;
-  console.log(req.body)
-  User.findOne({ email })
-    .then((user) => {
-      if (!user) {
-        const error = new Error("A user with this email could not be found.");
-        error.statusCode = 401;
-        throw error;
-      }
-      loadedUser = user;
-      return bcrypt.compare(password, user.password);
-    })
-    .then((isEqual) => {
-      if (!isEqual) {
-        const error = new Error("Wrong password.");
-        error.statusCode = 401;
-        throw error;
-      }
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      const error = new Error("A user with this email could not be found.");
+      error.statusCode = 401;
+      throw error;
+    }
+    loadedUser = user;
+    const isEqual = await bcrypt.compare(password, user.password);
+    if (!isEqual) {
+      const error = new Error("Wrong password.");
+      error.statusCode = 401;
+      throw error;
+    }
 
-      const token = jwt.sign(
-        {
-          email: loadedUser.email,
-          userId: loadedUser._id.toString(),
-        },
-        process.env.TOKEN_SECRET,
-        { expiresIn: "1h" }
-      );
+    const token = jwt.sign(
+      {
+        email: loadedUser.email,
+        userId: loadedUser._id.toString(),
+      },
+      process.env.TOKEN_SECRET,
+      { expiresIn: "1h" }
+    );
 
-      res.status(200).json({ token, userId: loadedUser._id });
-    })
-    .catch((err) => {
-      console.log(err)
-      handleError(err,next);
-    });
+    res.status(200).json({ token, userId: loadedUser._id });
+    return;
+  } catch (err) {
+    handleError(err, next);
+    return err;
+  }
 };

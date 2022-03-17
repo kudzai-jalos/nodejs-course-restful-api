@@ -42,7 +42,7 @@ exports.getPosts = (req, res, next) => {
     });
 };
 
-exports.createPost = (req, res, next) => {
+exports.createPost = async (req, res, next) => {
   const { title, content } = req.body;
   const errors = validationResult(req);
 
@@ -66,32 +66,34 @@ exports.createPost = (req, res, next) => {
     creator: req.userId,
   });
   let creator;
-  post
-    .save()
-    .then((result) => {
-      return User.findById(req.userId);
-    })
-    .then((user) => {
-      user.posts.push(post);
-      creator = user;
-      return user.save();
-    })
-    .then((result) => {
-      console.log(result);
-      res.status(201).json({
-        message: "Post created successfully",
-        post: {
-          ...post,
-          creator: {
-            _id: creator._id,
-            name: creator.name,
-          },
+  try {
+    await post.save();
+    const user = await User.findById(req.userId);
+    // console.log("USER:", user);
+    user.posts.push(post);
+    creator = user;
+    await user.save();
+    res.status(201).json({
+      message: "Post created successfully",
+      post: {
+        ...post._doc,
+        creator: {
+          _id: creator._id,
+          name: creator.name,
         },
-      });
-    })
-    .catch((err) => {
-      handleError(err, next);
+      },
     });
+    return {
+      message: "Post created successfully",
+      post: {
+        ...post._doc,
+        creator,
+      },
+    };
+  } catch (err) {
+    handleError(err, next);
+    return err;
+  }
 };
 
 exports.updatePost = (req, res, next) => {
@@ -214,22 +216,23 @@ exports.deletePost = (req, res, next) => {
     });
 };
 
-exports.getStatus = (req, res, next) => {
-  User.findById(req.userId)
-    .then((user) => {
-      res.status(200).json({
-        message: "Status fetched",
-        status: user.status,
-      });
-    })
-    .catch((err) => {
-      handleError(err, next);
+exports.getStatus = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    res.status(200).json({
+      message: "Status fetched",
+      status: user.status,
     });
+    return;
+  } catch (err) {
+    handleError(err, next);
+  }
 };
 
 exports.updateStatus = (req, res, next) => {
   const { status } = req.body;
-  User.findById(req.userId)
+  return User.findById(req.userId)
     .then((user) => {
       user.status = status;
       return user.save();
